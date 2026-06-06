@@ -1,17 +1,72 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:csv/csv.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 import '../../core/providers.dart';
 import '../../shared/widgets/sleep_chart.dart';
 import '../../shared/widgets/quality_stars.dart';
 
-class SleepHistoryScreen extends ConsumerWidget {
+class SleepHistoryScreen extends ConsumerStatefulWidget {
   const SleepHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SleepHistoryScreen> createState() => _SleepHistoryScreenState();
+}
+
+class _SleepHistoryScreenState extends ConsumerState<SleepHistoryScreen> {
+  bool _exporting = false;
+
+  Future<void> _exportCsv(List<Map<String, dynamic>> logs) async {
+    setState(() => _exporting = true);
+    try {
+      final rows = <List<dynamic>>[
+        ['Date', 'Sleep Start', 'Sleep End', 'Duration (hrs)', 'Quality', 'Notes', 'Split Sleep'],
+        ...logs.map((log) {
+          final start = log['sleep_start'] as String?;
+          final end = log['sleep_end'] as String?;
+          double? duration;
+          if (start != null && end != null) {
+            try {
+              final s = DateTime.parse(start);
+              final e = DateTime.parse(end);
+              var d = e.difference(s).inMinutes / 60.0;
+              if (d < 0) d += 24;
+              duration = d;
+            } catch (_) {}
+          }
+          return [
+            log['date'] ?? '',
+            start ?? '',
+            end ?? '',
+            duration?.toStringAsFixed(2) ?? '',
+            log['quality'] ?? '',
+            log['notes'] ?? '',
+            (log['is_split_sleep'] as int?) == 1 ? 'Yes' : 'No',
+          ];
+        }),
+      ];
+
+      final csv = const ListToCsvConverter().convert(rows);
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/shiftrest_sleep_log.csv');
+      await file.writeAsString(csv);
+
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/csv')],
+        subject: 'ShiftRest sleep data export',
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final logsAsync = ref.watch(sleepLogsProvider);
     final profileAsync = ref.watch(profileProvider);
 
@@ -21,9 +76,29 @@ class SleepHistoryScreen extends ConsumerWidget {
       error: (_, __) => 7.5,
     );
 
+    final logs = logsAsync.asData?.value ?? [];
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Sleep History')),
+      appBar: AppBar(
+        title: const Text('Sleep History'),
+        actions: [
+          if (logs.isNotEmpty)
+            IconButton(
+              icon: _exporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.primary),
+                    )
+                  : const Icon(Icons.download_outlined,
+                      color: AppColors.primary),
+              tooltip: 'Export CSV',
+              onPressed: _exporting ? null : () => _exportCsv(logs),
+            ),
+        ],
+      ),
       body: logsAsync.when(
         data: (logs) {
           if (logs.isEmpty) {

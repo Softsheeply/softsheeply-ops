@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../core/constants.dart';
 import '../../core/providers.dart';
 import '../../core/sleep_planner_service.dart';
+import '../../core/alertness_service.dart';
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,7 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       vsync: this,
     );
     _cardAnimations = List.generate(
-      6,
+      7,
       (i) => CurvedAnimation(
         parent: _fadeController,
         curve: Interval(i * 0.08, 0.55 + i * 0.08, curve: Curves.easeOut),
@@ -152,9 +153,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   const SizedBox(height: 12),
 
-                  // Quick log button
+                  // Alertness prediction
                   _buildFadeSlide(
                     _cardAnimations[5],
+                    _AlertnessCard(
+                      shiftsAsync: shiftsAsync,
+                      profileAsync: profileAsync,
+                      todayStr: todayStr,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Quick log button
+                  _buildFadeSlide(
+                    _cardAnimations[6],
                     _QuickLogCard(),
                   ),
                   const SizedBox(height: 24),
@@ -914,6 +926,163 @@ class _SleepDebtCard extends ConsumerWidget {
       if (date != null && date.isAfter(weekAgo)) dates.add(dateStr);
     }
     return dates.length;
+  }
+}
+
+// ---- Alertness Card ----
+
+class _AlertnessCard extends ConsumerWidget {
+  final AsyncValue<List<ShiftModel>> shiftsAsync;
+  final AsyncValue<Map<String, dynamic>?> profileAsync;
+  final String todayStr;
+
+  const _AlertnessCard({
+    required this.shiftsAsync,
+    required this.profileAsync,
+    required this.todayStr,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logsAsync = ref.watch(sleepLogsProvider);
+
+    final goalHours = profileAsync.when(
+      data: (p) => (p?['sleep_goal_hours'] as num?)?.toDouble() ?? 7.5,
+      loading: () => 7.5,
+      error: (_, __) => 7.5,
+    );
+
+    final logs = logsAsync.asData?.value ?? [];
+    if (logs.isEmpty) return const SizedBox.shrink();
+
+    // Find today's shift start for prediction context
+    final todayShift = shiftsAsync.asData?.value
+        .cast<ShiftModel?>()
+        .firstWhere((s) => s?.date == todayStr, orElse: () => null);
+
+    DateTime? shiftStart;
+    if (todayShift?.startTime != null) {
+      final now = DateTime.now();
+      final parts = todayShift!.startTime!.split(':');
+      shiftStart = DateTime(
+        now.year, now.month, now.day,
+        int.parse(parts[0]), int.parse(parts[1]),
+      );
+      if (shiftStart.isBefore(now)) shiftStart = null;
+    }
+
+    final prediction = AlertnessService.predict(
+      now: DateTime.now(),
+      lastWakeTime: _parseLastWakeTime(logs),
+      recentLogs: logs,
+      sleepGoalHours: goalHours,
+      shiftStartTime: shiftStart,
+    );
+
+    final levelColor = Color(AlertnessService.levelHue(prediction.level).toInt());
+    final levelLabel = AlertnessService.levelLabel(prediction.level);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: levelColor.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🧠', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(
+                'Alertness Prediction',
+                style: GoogleFonts.nunito(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: levelColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  levelLabel,
+                  style: GoogleFonts.nunito(
+                    color: levelColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${prediction.score.round()}',
+                style: GoogleFonts.jetBrainsMono(
+                  color: levelColor,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6, left: 4),
+                child: Text(
+                  '/100',
+                  style: GoogleFonts.jetBrainsMono(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: prediction.score / 100,
+              backgroundColor: AppColors.surfaceVariant,
+              valueColor: AlwaysStoppedAnimation<Color>(levelColor.withOpacity(0.7)),
+              minHeight: 5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (prediction.tips.isNotEmpty)
+            Text(
+              prediction.tips.first,
+              style: GoogleFonts.nunito(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                height: 1.4,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+    );
+  }
+
+  DateTime? _parseLastWakeTime(List<Map<String, dynamic>> logs) {
+    if (logs.isEmpty) return null;
+    final recent = logs.first;
+    final endStr = recent['sleep_end'] as String?;
+    if (endStr == null) return null;
+    try {
+      return DateTime.parse(endStr);
+    } catch (_) {
+      return null;
+    }
   }
 }
 

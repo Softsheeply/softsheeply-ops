@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../core/providers.dart';
@@ -155,6 +156,15 @@ class _SleepLogScreenState extends ConsumerState<SleepLogScreen>
       };
 
       await ref.read(sleepLogsProvider.notifier).add(log);
+
+      // Prompt for review on every 5th log entry
+      final allLogs = ref.read(sleepLogsProvider).asData?.value ?? [];
+      if (allLogs.length >= 5 && allLogs.length % 5 == 0) {
+        final inAppReview = InAppReview.instance;
+        if (await inAppReview.isAvailable()) {
+          await inAppReview.requestReview();
+        }
+      }
 
       await _successController.forward();
       await Future.delayed(const Duration(milliseconds: 500));

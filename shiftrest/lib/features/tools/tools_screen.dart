@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
+import 'meal_timing_screen.dart';
 
 class ToolsScreen extends StatefulWidget {
   const ToolsScreen({super.key});
@@ -18,7 +19,7 @@ class _ToolsScreenState extends State<ToolsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -46,6 +47,7 @@ class _ToolsScreenState extends State<ToolsScreen>
             Tab(text: '💡 Light'),
             Tab(text: '🔄 Recovery'),
             Tab(text: '🌿 Melatonin'),
+            Tab(text: '🍽️ Meals'),
           ],
         ),
       ),
@@ -56,6 +58,7 @@ class _ToolsScreenState extends State<ToolsScreen>
           LightGuideTab(),
           RecoveryPlannerTab(),
           MelatoninTimingTab(),
+          MealTimingTab(),
         ],
       ),
     );

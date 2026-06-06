@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database.dart';
 import 'sleep_planner_service.dart';
+import 'widget_service.dart';
 import '../core/constants.dart';
 
 // ---- Shared Preferences ----
@@ -72,11 +73,13 @@ class ShiftsNotifier
       await AppDatabase.instance.insertShift(shift.toMap());
     }
     await loadUpcoming();
+    WidgetService.update();
   }
 
   Future<void> delete(int id) async {
     await AppDatabase.instance.deleteShift(id);
     await loadUpcoming();
+    WidgetService.update();
   }
 }
 
@@ -124,6 +127,7 @@ class SleepPlansNotifier
       }
 
       state = AsyncValue.data(plans);
+      WidgetService.update();
     } catch (e, s) {
       state = AsyncValue.error(e, s);
     }

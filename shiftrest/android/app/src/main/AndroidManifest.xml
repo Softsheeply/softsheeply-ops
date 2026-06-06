@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+    <uses-permission android:name="android.permission.health.WRITE_SLEEP"/>
 
     <application
         android:label="ShiftRest"
@@ -37,6 +39,28 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
+
+        <!-- Home screen widget -->
+        <receiver
+            android:name=".ShiftRestWidgetProvider"
+            android:exported="true"
+            android:label="ShiftRest Widget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/shiftrest_widget_info" />
+        </receiver>
+
+        <!-- Health Connect -->
+        <activity
+            android:name="androidx.health.connect.client.PermissionController"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
 
         <meta-data
             android:name="flutterEmbedding"

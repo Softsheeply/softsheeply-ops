@@ -6,6 +6,7 @@ import '../../core/constants.dart';
 import '../../core/providers.dart';
 import '../../core/notifications.dart';
 import '../../core/database.dart';
+import '../../core/health_connect_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -27,6 +28,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _darkMode = true;
   bool _loading = true;
   bool _saving = false;
+  bool _importingHealth = false;
 
   @override
   void initState() {
@@ -95,6 +97,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _importFromHealthConnect() async {
+    setState(() => _importingHealth = true);
+    try {
+      final service = HealthConnectService.instance;
+      final availability = await service.checkAvailability();
+
+      if (availability == HealthConnectAvailability.unavailable) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Health Connect not available on this device',
+                  style: GoogleFonts.nunito(color: Colors.white)),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (availability == HealthConnectAvailability.notInstalled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Health Connect is not installed',
+                  style: GoogleFonts.nunito(color: Colors.white)),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+
+      final granted = await service.requestPermissions();
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Permission denied — enable sleep access in Health Connect',
+                  style: GoogleFonts.nunito(color: Colors.white)),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+
+      final entries = await service.fetchSleepData(days: 30);
+      if (entries.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No sleep data found in Health Connect (last 30 days)',
+                  style: GoogleFonts.nunito(color: Colors.white)),
+              backgroundColor: AppColors.textSecondary,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => _HealthImportSheet(entries: entries),
+      );
+
+      ref.invalidate(sleepLogsProvider);
+    } finally {
+      if (mounted) setState(() => _importingHealth = false);
     }
   }
 
@@ -510,6 +588,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Health Connect
+            _SectionTitle('Health Connect'),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _importingHealth ? null : _importFromHealthConnect,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Text('🩺', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Import sleep from Health Connect',
+                            style: GoogleFonts.sora(
+                                color: AppColors.text,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            'Import last 30 days from wearable devices',
+                            style: GoogleFonts.nunito(
+                                color: AppColors.textSecondary,
+                                fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _importingHealth
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.primary),
+                          )
+                        : const Icon(Icons.chevron_right,
+                            color: AppColors.primary, size: 18),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 32),
 
             // Version
@@ -615,6 +755,141 @@ class _ToggleRow extends StatelessWidget {
         ),
         Switch(value: value, onChanged: onChanged),
       ],
+    );
+  }
+}
+
+// ---- Health Connect import bottom sheet ----
+
+class _HealthImportSheet extends StatefulWidget {
+  final List<SleepImportEntry> entries;
+  const _HealthImportSheet({required this.entries});
+
+  @override
+  State<_HealthImportSheet> createState() => _HealthImportSheetState();
+}
+
+class _HealthImportSheetState extends State<_HealthImportSheet> {
+  late final List<bool> _selected;
+  bool _importing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List.filled(widget.entries.length, true);
+  }
+
+  Future<void> _import() async {
+    setState(() => _importing = true);
+    try {
+      final toImport = <SleepImportEntry>[];
+      for (int i = 0; i < widget.entries.length; i++) {
+        if (_selected[i]) toImport.add(widget.entries[i]);
+      }
+      final count = await HealthConnectService.instance.importEntries(toImport);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Imported $count sleep entries',
+                style: GoogleFonts.nunito(color: Colors.white)),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  String _fmt(DateTime dt) {
+    final h = dt.hour;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final ampm = h < 12 ? 'AM' : 'PM';
+    final dh = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    return '$dh:$m $ampm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedCount = _selected.where((s) => s).length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Sleep data from Health Connect',
+                style: GoogleFonts.sora(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          Text(
+            '${widget.entries.length} entries found. Select which to import:',
+            style: GoogleFonts.nunito(
+                color: AppColors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: widget.entries.length,
+              itemBuilder: (ctx, i) {
+                final entry = widget.entries[i];
+                return CheckboxListTile(
+                  dense: true,
+                  value: _selected[i],
+                  onChanged: (v) => setState(() => _selected[i] = v ?? false),
+                  activeColor: AppColors.primary,
+                  title: Text(
+                    entry.date,
+                    style: GoogleFonts.sora(
+                        color: AppColors.text, fontSize: 13),
+                  ),
+                  subtitle: Text(
+                    '${_fmt(entry.sleepStart)} → ${_fmt(entry.sleepEnd)}  '
+                    '(${entry.durationHours.toStringAsFixed(1)}h)  · ${entry.source}',
+                    style: GoogleFonts.nunito(
+                        color: AppColors.textSecondary, fontSize: 11),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: (_importing || selectedCount == 0) ? null : _import,
+              child: _importing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child:
+                          CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      'Import $selectedCount entr${selectedCount == 1 ? "y" : "ies"}',
+                      style: GoogleFonts.nunito(
+                          fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
