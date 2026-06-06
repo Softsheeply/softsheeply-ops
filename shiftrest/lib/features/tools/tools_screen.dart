@@ -18,7 +18,7 @@ class _ToolsScreenState extends State<ToolsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -40,10 +40,12 @@ class _ToolsScreenState extends State<ToolsScreen>
           unselectedLabelColor: AppColors.textSecondary,
           labelStyle: GoogleFonts.nunito(
               fontSize: 13, fontWeight: FontWeight.w600),
+          isScrollable: true,
           tabs: const [
             Tab(text: '☕ Caffeine'),
             Tab(text: '💡 Light'),
             Tab(text: '🔄 Recovery'),
+            Tab(text: '🌿 Melatonin'),
           ],
         ),
       ),
@@ -53,6 +55,7 @@ class _ToolsScreenState extends State<ToolsScreen>
           CaffeineCalculatorTab(),
           LightGuideTab(),
           RecoveryPlannerTab(),
+          MelatoninTimingTab(),
         ],
       ),
     );
@@ -782,6 +785,436 @@ class _RecoveryDayCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---- Melatonin Timing ----
+
+class MelatoninTimingTab extends StatefulWidget {
+  const MelatoninTimingTab({super.key});
+
+  @override
+  State<MelatoninTimingTab> createState() => _MelatoninTimingTabState();
+}
+
+class _MelatoninTimingTabState extends State<MelatoninTimingTab> {
+  TimeOfDay _targetSleepTime = const TimeOfDay(hour: 22, minute: 0);
+  String _shiftType = 'night';
+  bool _showResult = false;
+
+  TimeOfDay get _melatoninTime {
+    // Low-dose melatonin (0.5mg) taken 2hrs before target sleep
+    // High-dose (3-5mg): 30-60 min before
+    int hour = _targetSleepTime.hour - 2;
+    if (hour < 0) hour += 24;
+    return TimeOfDay(hour: hour, minute: _targetSleepTime.minute);
+  }
+
+  TimeOfDay get _highDoseTime {
+    int hour = _targetSleepTime.hour;
+    int minute = _targetSleepTime.minute - 45;
+    if (minute < 0) {
+      minute += 60;
+      hour = (hour - 1) % 24;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _fmt(TimeOfDay t) {
+    final hour = t.hour;
+    final minute = t.minute.toString().padLeft(2, '0');
+    final ampm = hour < 12 ? 'AM' : 'PM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    return '$displayHour:$minute $ampm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ToolCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Melatonin Timing Calculator',
+                  style: GoogleFonts.sora(
+                      color: AppColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Melatonin works by timing, not by knocking you out. Most shift workers take it wrong.',
+                  style: GoogleFonts.nunito(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'When do you need to fall asleep?',
+                  style: GoogleFonts.sora(
+                      color: AppColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: _targetSleepTime,
+                      builder: (ctx, child) => Theme(
+                        data: Theme.of(ctx).copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: AppColors.primary,
+                            surface: AppColors.surface,
+                            onSurface: AppColors.text,
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _targetSleepTime = picked;
+                        _showResult = true;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.bedtime_outlined,
+                            color: AppColors.nightPurple, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          _fmt(_targetSleepTime),
+                          style: GoogleFonts.jetBrainsMono(
+                            color: AppColors.text,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Shift type',
+                  style: GoogleFonts.sora(
+                      color: AppColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: ['day', 'night', 'off'].map((type) {
+                    final labels = {
+                      'day': '🌅 Day shift',
+                      'night': '🌙 Night shift',
+                      'off': '✅ Day off'
+                    };
+                    return GestureDetector(
+                      onTap: () =>
+                          setState(() => _shiftType = type),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _shiftType == type
+                              ? AppColors.nightPurple.withOpacity(0.2)
+                              : AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _shiftType == type
+                                ? AppColors.nightPurple
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          labels[type]!,
+                          style: GoogleFonts.nunito(
+                            color: _shiftType == type
+                                ? AppColors.nightPurple
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: _shiftType == type
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.nightPurple),
+                    onPressed: () => setState(() => _showResult = true),
+                    child: Text(
+                      'Calculate timing',
+                      style: GoogleFonts.nunito(
+                          fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (_showResult) ...[
+            const SizedBox(height: 16),
+
+            // Low dose recommendation
+            _MelatoninResultCard(
+              label: 'Low dose (0.5mg) — Recommended',
+              time: _melatoninTime,
+              description:
+                  'Most effective for circadian shifting. Take 0.5mg at ${_fmt(_melatoninTime)} — 2 hours before your target sleep. This dose mimics natural melatonin without grogginess.',
+              color: AppColors.success,
+              isRecommended: true,
+            ),
+            const SizedBox(height: 10),
+
+            // High dose info
+            _MelatoninResultCard(
+              label: 'Higher dose (1–5mg)',
+              time: _highDoseTime,
+              description:
+                  'Take 45–60 min before sleep at ${_fmt(_highDoseTime)}. May cause grogginess the next day. Start low — more melatonin is not more effective for shifting your clock.',
+              color: AppColors.accent,
+              isRecommended: false,
+            ),
+            const SizedBox(height: 16),
+
+            _MelatoninScienceCard(shiftType: _shiftType),
+            const SizedBox(height: 16),
+            _MelatoninWarnings(),
+          ],
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+}
+
+class _MelatoninResultCard extends StatelessWidget {
+  final String label;
+  final TimeOfDay time;
+  final String description;
+  final Color color;
+  final bool isRecommended;
+
+  const _MelatoninResultCard({
+    required this.label,
+    required this.time,
+    required this.description,
+    required this.color,
+    required this.isRecommended,
+  });
+
+  String _fmt(TimeOfDay t) {
+    final hour = t.hour;
+    final minute = t.minute.toString().padLeft(2, '0');
+    final ampm = hour < 12 ? 'AM' : 'PM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    return '$displayHour:$minute $ampm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.sora(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+              ),
+              if (isRecommended) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '✓ Best for shift workers',
+                    style: GoogleFonts.nunito(
+                        color: AppColors.success,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Take at ${_fmt(time)}',
+            style: GoogleFonts.jetBrainsMono(
+              color: color,
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: GoogleFonts.nunito(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MelatoninScienceCard extends StatelessWidget {
+  final String shiftType;
+  const _MelatoninScienceCard({required this.shiftType});
+
+  @override
+  Widget build(BuildContext context) {
+    final tips = shiftType == 'night'
+        ? [
+            'Take melatonin ~2hrs before your daytime sleep window starts.',
+            'Keep the room fully dark — even small light exposure blocks melatonin.',
+            'Do not take melatonin at the start of your night shift — it will make you drowsy when you need to be alert.',
+            'Consistent dosing time retrains your clock faster than random use.',
+          ]
+        : shiftType == 'day'
+            ? [
+                'Take melatonin 2hrs before your target bedtime.',
+                'Combine with a dim, screen-free wind-down routine.',
+                'Melatonin is most useful when switching shift types — less necessary for stable schedules.',
+              ]
+            : [
+                'Recovery day — take melatonin at your desired anchor sleep time minus 2hrs.',
+                'This helps signal to your body what time you want to sleep.',
+                'Use consistently for 3–4 nights to re-anchor your rhythm.',
+              ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.nightPurple.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppColors.nightPurple.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🔬', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(
+                'Science-backed tips for shift workers',
+                style: GoogleFonts.sora(
+                    color: AppColors.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...tips.map((tip) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('•',
+                        style: GoogleFonts.nunito(
+                            color: AppColors.nightPurple,
+                            fontSize: 14)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        tip,
+                        style: GoogleFonts.nunito(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            height: 1.5),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _MelatoninWarnings extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: AppColors.textSecondary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '⚠️  A few things',
+            style: GoogleFonts.sora(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Melatonin is a supplement, not a sleeping pill. It works best at low doses (0.5–1mg). Avoid driving or operating machinery after taking it. If you\'re on medication, check with your doctor.\n\nThis tool provides timing guidance only — not medical advice.',
+            style: GoogleFonts.nunito(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                height: 1.6),
           ),
         ],
       ),

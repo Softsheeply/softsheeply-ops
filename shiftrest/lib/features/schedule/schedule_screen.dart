@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
@@ -55,6 +56,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       appBar: AppBar(
         title: const Text('Schedule'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_outlined, size: 20),
+            tooltip: 'Shift patterns',
+            onPressed: () => context.go('/schedule/patterns'),
+          ),
           TextButton.icon(
             icon: const Icon(Icons.today, size: 16),
             label: Text('Today',

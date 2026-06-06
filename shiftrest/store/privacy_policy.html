@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShiftRest — Privacy Policy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #080C14;
+      color: #E8EAF6;
+      line-height: 1.7;
+      padding: 24px 20px 60px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    h2 { font-size: 17px; font-weight: 600; color: #3D5AFE; margin: 28px 0 10px; }
+    p { color: #8892A4; margin-bottom: 14px; font-size: 15px; }
+    .last-updated { color: #8892A4; font-size: 13px; margin-bottom: 32px; }
+    .highlight {
+      background: rgba(61, 90, 254, 0.1);
+      border-left: 3px solid #3D5AFE;
+      padding: 14px 16px;
+      border-radius: 0 10px 10px 0;
+      margin-bottom: 24px;
+    }
+    .highlight p { margin: 0; color: #E8EAF6; }
+    ul { color: #8892A4; padding-left: 20px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; font-size: 15px; }
+    a { color: #3D5AFE; }
+    footer { margin-top: 48px; color: #8892A4; font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <h1>🌙 ShiftRest</h1>
+  <p class="last-updated">Privacy Policy — Last updated: June 2026</p>
+
+  <div class="highlight">
+    <p><strong>The short version:</strong> ShiftRest stores everything on your device. No accounts, no servers, no tracking, no ads. Your sleep data is yours.</p>
+  </div>
+
+  <h2>1. What data does ShiftRest collect?</h2>
+  <p>ShiftRest collects <strong>no data from you</strong>. The app does not connect to any server, does not require an account, and does not transmit any information over the internet.</p>
+  <p>All data you enter — including your name, job type, sleep goal, shift schedule, sleep logs, and sleep plans — is stored exclusively in a local SQLite database on your device.</p>
+
+  <h2>2. What is stored on your device?</h2>
+  <ul>
+    <li>Your profile (name, job type, sleep goal) — stored in SQLite</li>
+    <li>Your shift schedule — stored in SQLite</li>
+    <li>Your sleep logs — stored in SQLite</li>
+    <li>Your generated sleep plans — stored in SQLite</li>
+    <li>App preferences (dark mode, notification settings) — stored in SharedPreferences</li>
+  </ul>
+  <p>None of this data leaves your device under any circumstances.</p>
+
+  <h2>3. Notifications</h2>
+  <p>ShiftRest can schedule local notifications (bedtime reminders, wake-up alarms, shift reminders). These are processed entirely on your device by the Android operating system. No notification data is transmitted externally.</p>
+  <p>Notification permission is requested the first time you use the sleep planner — not on app launch.</p>
+
+  <h2>4. Third-party services</h2>
+  <p>ShiftRest uses the following open-source packages, none of which collect or transmit user data:</p>
+  <ul>
+    <li><strong>Google Fonts</strong> — fonts may be downloaded from Google's CDN on first use if not cached. This is standard Android font rendering behaviour.</li>
+    <li><strong>sqflite</strong> — local SQLite database library</li>
+    <li><strong>flutter_local_notifications</strong> — local notification scheduling</li>
+    <li><strong>fl_chart</strong> — chart rendering library (no network access)</li>
+  </ul>
+
+  <h2>5. Children's privacy</h2>
+  <p>ShiftRest does not knowingly collect data from anyone, including children under 13. As no data is collected by the app, COPPA and similar regulations do not apply.</p>
+
+  <h2>6. Data deletion</h2>
+  <p>You can delete all locally stored data at any time by going to <strong>Settings → Clear all data</strong>. This permanently removes your profile, shift schedule, sleep logs, and all generated plans from the device.</p>
+  <p>Uninstalling the app also removes all locally stored data.</p>
+
+  <h2>7. Changes to this policy</h2>
+  <p>If ShiftRest ever introduces features that involve data collection or external services, this privacy policy will be updated and users will be notified via an in-app notice.</p>
+
+  <h2>8. Contact</h2>
+  <p>If you have questions about this privacy policy, contact us at: <a href="mailto:hello@softsheeply.com">hello@softsheeply.com</a></p>
+
+  <footer>
+    ShiftRest by Softsheeply · Built for the people who work while the world sleeps.
+  </footer>
+
+</body>
+</html>

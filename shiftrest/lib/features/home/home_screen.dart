@@ -27,10 +27,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       vsync: this,
     );
     _cardAnimations = List.generate(
-      5,
+      6,
       (i) => CurvedAnimation(
         parent: _fadeController,
-        curve: Interval(i * 0.1, 0.6 + i * 0.1, curve: Curves.easeOut),
+        curve: Interval(i * 0.08, 0.55 + i * 0.08, curve: Curves.easeOut),
       ),
     );
     _fadeController.forward();
@@ -145,9 +145,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   const SizedBox(height: 12),
 
-                  // Quick log button
+                  // Sleep debt tracker
                   _buildFadeSlide(
                     _cardAnimations[4],
+                    _SleepDebtCard(profileAsync: profileAsync),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Quick log button
+                  _buildFadeSlide(
+                    _cardAnimations[5],
                     _QuickLogCard(),
                   ),
                   const SizedBox(height: 24),
@@ -742,6 +749,171 @@ class _QuickLogCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ---- Sleep Debt Card ----
+
+class _SleepDebtCard extends ConsumerWidget {
+  final AsyncValue<Map<String, dynamic>?> profileAsync;
+  const _SleepDebtCard({required this.profileAsync});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logsAsync = ref.watch(sleepLogsProvider);
+
+    final goalHours = profileAsync.when(
+      data: (p) => (p?['sleep_goal_hours'] as num?)?.toDouble() ?? 7.5,
+      loading: () => 7.5,
+      error: (_, __) => 7.5,
+    );
+
+    return logsAsync.when(
+      data: (logs) {
+        final weekDebt = _computeWeekDebt(logs, goalHours);
+        final daysLogged = _daysLoggedThisWeek(logs);
+        final isDeficit = weekDebt < 0;
+        final color = isDeficit
+            ? AppColors.warning
+            : weekDebt > 1
+                ? AppColors.success
+                : AppColors.primary;
+        final absDebt = weekDebt.abs();
+
+        if (daysLogged == 0) return const SizedBox.shrink();
+
+        return GestureDetector(
+          onTap: () => context.go('/history'),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: color.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(isDeficit ? '😓' : '✨',
+                        style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Sleep debt this week',
+                      style: GoogleFonts.nunito(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$daysLogged/7 days logged',
+                      style: GoogleFonts.nunito(
+                          color: AppColors.textSecondary, fontSize: 10),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      isDeficit
+                          ? '-${absDebt.toStringAsFixed(1)}h'
+                          : '+${absDebt.toStringAsFixed(1)}h',
+                      style: GoogleFonts.jetBrainsMono(
+                        color: color,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        isDeficit ? 'behind goal' : 'ahead of goal',
+                        style: GoogleFonts.nunito(
+                            color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (absDebt / (goalHours * 7)).clamp(0.0, 1.0),
+                    backgroundColor: AppColors.surfaceVariant,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        color.withOpacity(0.7)),
+                    minHeight: 6,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isDeficit
+                      ? 'Try to recover ${absDebt.toStringAsFixed(1)}h before your next heavy week.'
+                      : 'Great work — you\'re staying ahead of your sleep goal.',
+                  style: GoogleFonts.nunito(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  double _computeWeekDebt(
+      List<Map<String, dynamic>> logs, double goalHours) {
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+    double actual = 0;
+    int days = 0;
+
+    for (final log in logs) {
+      final dateStr = log['date'] as String?;
+      if (dateStr == null) continue;
+      final date = DateTime.tryParse(dateStr);
+      if (date == null || date.isBefore(weekAgo)) continue;
+
+      final start = log['sleep_start'] as String?;
+      final end = log['sleep_end'] as String?;
+      if (start != null && end != null) {
+        try {
+          final s = DateTime.parse(start);
+          final e = DateTime.parse(end);
+          var diff = e.difference(s).inMinutes / 60.0;
+          if (diff < 0) diff += 24;
+          actual += diff;
+          days++;
+        } catch (_) {}
+      }
+    }
+
+    if (days == 0) return 0;
+    final goal = goalHours * days;
+    return actual - goal;
+  }
+
+  int _daysLoggedThisWeek(List<Map<String, dynamic>> logs) {
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+    final dates = <String>{};
+    for (final log in logs) {
+      final dateStr = log['date'] as String?;
+      if (dateStr == null) continue;
+      final date = DateTime.tryParse(dateStr);
+      if (date != null && date.isAfter(weekAgo)) dates.add(dateStr);
+    }
+    return dates.length;
   }
 }
 

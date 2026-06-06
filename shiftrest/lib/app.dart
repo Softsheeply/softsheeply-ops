@@ -13,6 +13,7 @@ import 'features/log/sleep_log_screen.dart';
 import 'features/log/sleep_history_screen.dart';
 import 'features/tools/tools_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/schedule/shift_patterns_screen.dart';
 
 class ShiftRestApp extends ConsumerWidget {
   final SharedPreferences prefs;
@@ -58,6 +59,13 @@ class ShiftRestApp extends ConsumerWidget {
             GoRoute(
               path: '/schedule',
               builder: (context, state) => const ScheduleScreen(),
+              routes: [
+                GoRoute(
+                  path: 'patterns',
+                  builder: (context, state) =>
+                      const ShiftPatternsScreen(),
+                ),
+              ],
             ),
             GoRoute(
               path: '/planner',
@@ -143,7 +151,8 @@ class _MainShell extends StatelessWidget {
     if (location.startsWith('/home') || location.startsWith('/log')) {
       return 0;
     }
-    if (location.startsWith('/schedule')) return 1;
+    if (location.startsWith('/schedule') ||
+        location.startsWith('/schedule/patterns')) return 1;
     if (location.startsWith('/planner')) return 2;
     if (location.startsWith('/history')) return 3;
     if (location.startsWith('/tools')) return 4;
