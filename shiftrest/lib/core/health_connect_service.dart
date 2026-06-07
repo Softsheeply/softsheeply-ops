@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:health/health.dart';
 import 'package:flutter/foundation.dart';
 import 'database.dart';
@@ -12,6 +13,9 @@ class HealthConnectService {
   static const _permissions = [HealthDataAccess.READ, HealthDataAccess.READ];
 
   Future<HealthConnectAvailability> checkAvailability() async {
+    // HealthKit ships with iOS — there's no separate SDK to install or check.
+    if (Platform.isIOS) return HealthConnectAvailability.available;
+
     try {
       return await Health().getHealthConnectSdkStatus() ==
               HealthConnectSdkStatus.sdkAvailable

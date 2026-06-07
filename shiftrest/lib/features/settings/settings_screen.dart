@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -590,8 +591,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Health Connect
-            _SectionTitle('Health Connect'),
+            // Health Connect / Apple Health
+            _SectionTitle(Platform.isIOS ? 'Apple Health' : 'Health Connect'),
             const SizedBox(height: 8),
             GestureDetector(
               onTap: _importingHealth ? null : _importFromHealthConnect,
@@ -622,7 +623,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Import sleep from Health Connect',
+                            Platform.isIOS
+                                ? 'Import sleep from Apple Health'
+                                : 'Import sleep from Health Connect',
                             style: GoogleFonts.sora(
                                 color: AppColors.text,
                                 fontSize: 14,
