@@ -1,0 +1,5 @@
+node_modules/
+ftc_rn.db
+ftc_rn.db-journal
+ftc_rn.db-wal
+ftc_rn.db-shm
